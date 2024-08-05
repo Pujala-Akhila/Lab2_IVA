@@ -9,6 +9,10 @@ Created on Sun Aug  4 20:22:46 2024
 import subprocess
 import json
 import os
+import cv2
+import numpy as np
+from PIL import Image
+from skimage.metrics import structural_similarity as ssim
 def get_frame_info(video_path):
     cmd = [
         'ffprobe',
@@ -20,7 +24,7 @@ def get_frame_info(video_path):
     ]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return json.loads(result.stdout)
-video_path = r"C:\Users\pujal\Downloads\image&video_analytics\8632511-uhd_2160_3840_30fps.mp4"
+video_path = r"C:\Users\pujal\Downloads\image&video_analytics\original_video.mp4"
 frame_info = get_frame_info(video_path)
 
 #Lab Task 2: Frame Type Analysis
@@ -70,8 +74,7 @@ def extract_frames(video_path, output_dir, frame_types):
             print(f"Error extracting {frame_type} frames:\n{result.stderr}")
         else:
             print(f"{frame_type} frames extracted successfully.")
-
-video_path = 'C:\\Users\\pujal\\Downloads\\image&video_analytics\\8632511-uhd_2160_3840_30fps.mp4'  # Replace with your video file path
+video_path = 'C:\\Users\\pujal\\Downloads\\image&video_analytics\\original_video.mp4'  
 output_dir = 'frames'
 frame_types = ['I', 'P', 'B']
 extract_frames(video_path, output_dir, frame_types)
@@ -84,7 +87,39 @@ def display_frames(frame_dir, frame_types):
             img = Image.open(frame_path)
             img.show()
 display_frames('frames', frame_types)
-
+# Calculate SSIM values
+def load_frames(frame_dir, frame_type):
+    frames = []
+    frame_files = sorted([f for f in os.listdir(frame_dir) if f.startswith(frame_type)])
+    for frame_file in frame_files:
+        frame_path = os.path.join(frame_dir, frame_file)
+        frame = cv2.imread(frame_path)
+        frames.append(frame)
+    return frames
+def calculate_ssim(frames, win_size=7):
+    ssim_values = []
+    for i in range(len(frames) - 1):
+        # Ensure frames are in grayscale
+        gray_frame1 = cv2.cvtColor(frames[i], cv2.COLOR_BGR2GRAY)
+        gray_frame2 = cv2.cvtColor(frames[i + 1], cv2.COLOR_BGR2GRAY)
+        
+        # Calculate SSIM with the specified win_size
+        ssim_value = ssim(gray_frame1, gray_frame2, win_size=win_size)
+        ssim_values.append(ssim_value)
+    return np.mean(ssim_values) if ssim_values else 0
+# Calculate and print SSIM values for each frame type
+ssim_results = {}
+for frame_type in frame_types:
+    frames = load_frames('frames', frame_type)
+    if frames:
+        avg_ssim = calculate_ssim(frames)
+        ssim_results[frame_type] = avg_ssim
+    else:
+        print(f"No {frame_type} frames found.")
+        ssim_results[frame_type] = None
+print("Average SSIM values for each frame type:")
+for frame_type, avg_ssim in ssim_results.items():
+    print(f"{frame_type} frames: {avg_ssim}")
 
 #Lab Task 4: Frame Compression Analysis
 #Calculate Frame Sizes
